@@ -1,0 +1,6 @@
+numpy
+Cython
+matplotlib
+scipy
+seaborn
+setuptools

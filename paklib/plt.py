@@ -102,17 +102,11 @@ def plot_pred(pred, ydata, key=None, min_pred=3):
     plt.show()
 
 
-def save_figure(fileName, pic='png'):
-    import os
-    from .io import make_dir_for_file
-    from .io import name_to_save
-    if type(fileName) == list:
-        fileName = os.path.join(*fileName)
-    fileName = name_to_save(fileName)
-    if pic:
-        fileName += '.' + pic
-    make_dir_for_file(fileName)
-    plt.savefig(fileName, dpi=200)
+def save_figure(name):
+    from .io import path, make_dir_for_file
+    name = path(name)
+    make_dir_for_file(name)
+    plt.savefig(name, dpi=200)
 
 
 def ROC_curve(pred, y, show=True):

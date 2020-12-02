@@ -37,9 +37,9 @@ def probability(r1, r2):
     return 1 / (1 + 10 ** ((r2 - r1) / 400))
 
 
-def exp_probability(r1, r2, alpha=0.0, beta=1.0, kLine=1.0, bLine=0.0):
+def exp_probability(r1, r2, alpha=0.0, beta=1.0, k=1.0, b=0.0):
     p = np.exp(alpha + beta * (r1 - r2)) / (1 + np.exp(alpha + beta * (r1 - r2)))
-    p = kLine * p + bLine
+    p = k * p + b
     return p
 
 

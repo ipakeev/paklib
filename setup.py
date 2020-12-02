@@ -5,7 +5,7 @@ from Cython.Distutils import build_ext
 
 setup(
     name='paklib',
-    version='0.2.0',
+    version='0.2.1',
     packages=find_packages(),
     ext_modules=[
         Extension('cyton', ['paklib/cyton.pyx']),

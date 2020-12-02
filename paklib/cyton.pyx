@@ -15,10 +15,10 @@ def probability(double r1, double r2):
     return 1 / (1 + 10 ** ((r2 - r1) / 400))
 
 
-def exp_probability(double r1, double r2, double alpha=0.0, double beta=1.0, double kLine=1.0, double bLine=0.0):
+def exp_probability(double r1, double r2, double alpha=0.0, double beta=1.0, double k=1.0, double b=0.0):
     cdef double p
     p = np.exp(alpha + beta * (r1 - r2)) / (1 + np.exp(alpha + beta * (r1 - r2)))
-    return kLine * p + bLine
+    return k * p + b
 
 
 def elo(double r1, double r2, double real_points, g=None):

@@ -1,4 +1,5 @@
 import numpy as np
+
 from paklib import data
 
 
@@ -10,6 +11,14 @@ def test_to_binary():
     src = data.to_binary([True, False, False, True], draw=[False, True, False, False])
     target = np.array([1.0, 0.5, 0.0, 1.0])
     assert np.all(src == target)
+
+
+def test_reward():
+    odd = [1.5, 1.9, 2.1]
+    win = [0.0, 1.0, 0.0]
+    draw = [False, False, True]
+    assert np.all(data.reward(odd, win) == np.array([-1.0, 0.9, -1.0]))
+    assert np.all(data.reward(odd, win, draw=draw) == np.array([-1.0, 0.9, 0.0]))
 
 
 def test_sort_on_other_list():

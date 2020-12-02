@@ -1,49 +1,46 @@
 import os
-import pickle as cp
+import pickle
 import shutil
+from typing import Union, List
+
+_table_path = str.maketrans('\t\\', '_/')
+_table_filename = str.maketrans('\t\\:/', '____')
 
 
-def name_to_save(name):
-    # name = name.replace(':', '_')
-    # name = name.replace('/', '_')
-    name = name.replace('\t', '_')
-    name = name.replace('\\', '/')
-    return name
+def path(name: Union[str, List[str]]) -> str:
+    if type(name) == str:
+        name = name.translate(_table_path)
+    else:
+        name = [i.translate(_table_path) for i in name]
+        name = os.path.join(*name)
+    return name.replace(os.sep, os.altsep)
 
 
-def correct_file_name(file_name):
-    if type(file_name) == list:
-        try:
-            file_name = [str(i).replace('\\', '/') for i in file_name]
-        except AttributeError:
-            print(file_name)
-            raise
-        file_name = os.path.join(*file_name)
-    file_name = name_to_save(file_name)
-    return file_name
+def filename(name: str) -> str:
+    return name.translate(_table_filename).replace(os.sep, '_')
 
 
-def load_pickle(file_name, mode='rb', not_found=dict):
-    file_name = correct_file_name(file_name)
+def load_pickle(name: Union[str, List[str]], mode='rb', not_found=dict):
+    name = path(name)
 
     try:
-        with open(file_name, mode) as op:
-            f = cp.load(op)
+        with open(name, mode) as op:
+            f = pickle.load(op)
     except IOError:
         f = not_found()
 
     return f
 
 
-def save_pickle(file_name, data, mode='wb'):
-    file_name = correct_file_name(file_name)
-    make_dir_for_file(file_name)
+def save_pickle(name: Union[str, List[str]], data, mode='wb'):
+    name = path(name)
+    make_dir_for_file(name)
 
     keyboardInterrupted = False
     while 1:
         try:
-            with open(file_name, mode) as op:
-                cp.dump(data, op)
+            with open(name, mode) as op:
+                pickle.dump(data, op)
         except KeyboardInterrupt:
             print('>!> Please, wait! Saving data...')
             keyboardInterrupted = True
@@ -57,44 +54,44 @@ def save_pickle(file_name, data, mode='wb'):
         break
 
 
-def pickle_2_to_3(name, name_after=None):
+def pickle_2_to_3(name: Union[str, List[str]], name_after=None):
     with open(name, 'rb') as op:
-        f = cp.load(op, encoding='latin1')
+        f = pickle.load(op, encoding='latin1')
     with open(name_after or name, 'wb') as op:
-        cp.dump(f, op)
+        pickle.dump(f, op)
 
 
-def pickle_3_to_2(name, name_after=None):
+def pickle_3_to_2(name: Union[str, List[str]], name_after=None):
     with open(name, 'rb') as op:
-        f = cp.load(op)
+        f = pickle.load(op)
     with open(name_after or name, 'wb') as op:
-        cp.dump(f, op, protocol=2)
+        pickle.dump(f, op, protocol=2)
 
 
-def is_file_existed(file_name):
-    file_name = correct_file_name(file_name)
-    return os.path.exists(file_name)
+def is_existed(name: Union[str, List[str]]):
+    name = path(name)
+    return os.path.exists(name)
 
 
-def make_dir_for_path(path):
-    path = correct_file_name(path)
-    os.makedirs(path, exist_ok=True)
+def make_dir_for_path(name: Union[str, List[str]]):
+    name = path(name)
+    os.makedirs(name, exist_ok=True)
 
 
-def make_dir_for_file(file_name):
-    file_name = correct_file_name(file_name)
-    path, file_name = os.path.split(file_name)
+def make_dir_for_file(name: Union[str, List[str]]):
+    name = path(name)
+    path_name, file_name = os.path.split(name)
     if path:
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(path_name, exist_ok=True)
 
 
-def clear_folder(path, remove_files=True, remove_dirs=True, func_files=None, func_dirs=None):
-    path = correct_file_name(path)
+def clear_folder(name: Union[str, List[str]], remove_files=True, remove_dirs=True, func_files=None, func_dirs=None):
+    name = path(name)
 
     try:
-        root, dirs, files = next(os.walk(path))
+        root, dirs, files = next(os.walk(name))
     except StopIteration:
-        print(f'>!> folder "{path}" is already clear')
+        print(f'>!> folder "{name}" is already clear')
         return
 
     if remove_files:
@@ -115,25 +112,25 @@ def clear_folder(path, remove_files=True, remove_dirs=True, func_files=None, fun
                 os.rmdir(os.path.join(root, name))
 
 
-def list_of_dirs(path):
-    path = correct_file_name(path)
-    return next(os.walk(path))[1]
+def list_of_dirs(name: Union[str, List[str]]):
+    name = path(name)
+    return next(os.walk(name))[1]
 
 
-def list_of_files(path):
-    path = correct_file_name(path)
-    return next(os.walk(path))[2]
+def list_of_files(name: Union[str, List[str]]):
+    name = path(name)
+    return next(os.walk(name))[2]
 
 
-def copy_file(src, dst):
-    src = correct_file_name(src)
-    dst = correct_file_name(dst)
+def copy_file(src: Union[str, List[str]], dst: Union[str, List[str]]):
+    src = path(src)
+    dst = path(dst)
     make_dir_for_file(dst)
     shutil.copy(src, dst)
 
 
-def move_file(src, dst):
-    src = correct_file_name(src)
-    dst = correct_file_name(dst)
+def move_file(src: Union[str, List[str]], dst: Union[str, List[str]]):
+    src = path(src)
+    dst = path(dst)
     make_dir_for_file(dst)
     shutil.move(src, dst)

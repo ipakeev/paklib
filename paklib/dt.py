@@ -21,10 +21,10 @@ def get_month_code(month: str) -> str:
     return months[month]
 
 
-def gone_minutes(mdt: datetime.datetime, now: datetime.datetime = None) -> float:
+def gone_minutes(from_date: datetime.datetime, now: datetime.datetime = None) -> float:
     if now is None:
         now = datetime.datetime.today()
-    return (now - mdt).total_seconds() / 60
+    return (now - from_date).total_seconds() / 60
 
 
 def string_from_date(date: datetime.date) -> str:

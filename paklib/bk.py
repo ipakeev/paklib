@@ -1,3 +1,6 @@
+import datetime
+from typing import List
+
 import numpy as np
 
 
@@ -148,3 +151,79 @@ def stake_system_optimal(tip_all, mn=2, mx=6, draw=0, stake=1, odd=1.85):
     plt.xticks(wins, ['{:.0f}\n{:.0f}%'.format(i, 100 * i / tip_all) for i in wins])
     plt.legend()
     plt.show()
+
+
+def describe(win: np.ndarray, draw: np.ndarray = None, odds: np.ndarray = None):
+    draw = draw if draw is not None else np.full(win.shape, False)
+    W = np.sum(win)
+    D = np.sum(draw)
+    L = win.shape[0] - W - D
+    N = W + L
+    P = W / N if N else np.nan
+    if odds is None:
+        return f'{W}/{D}/{L} ({N}), p={P:.3f}'
+    else:
+        B = (odds - 1.0)[win].sum() - L
+        ROI = B / N if N else np.nan
+        return f'{W}/{D}/{L} ({N}), b={B:.1f}, p={P:.3f}, roi={ROI:.3f}'
+
+
+class Bank(object):
+
+    def __init__(self):
+        self.line: List[dict] = []
+
+    @property
+    def win(self):
+        return sum([i['plus'] > 0.0 for i in self.line])
+
+    @property
+    def draw(self):
+        return sum([i['plus'] == 0.0 for i in self.line])
+
+    @property
+    def lose(self):
+        return sum([i['plus'] < 0.0 for i in self.line])
+
+    @property
+    def n_stakes(self):
+        return sum([i['plus'] != 0.0 for i in self.line])
+
+    @property
+    def bank(self):
+        return sum([i['plus'] for i in self.line])
+
+    @property
+    def proba(self):
+        n = self.n_stakes
+        return (self.win / n) if n else np.nan
+
+    @property
+    def roi(self):
+        n = self.n_stakes
+        return (self.bank / n) if n else np.nan
+
+    def stake(self, date_time: datetime.datetime, id: str, name: str,
+              value: float, odds: float, win: bool, draw: bool = False):
+        assert not (win and draw)
+        if win:
+            plus = value * (odds - 1.0)
+        elif draw:
+            plus = 0.0
+        else:
+            plus = -value
+        self.line.append(dict(date_time=date_time, id=id, name=name,
+                              value=value, odds=odds, win=win, draw=draw, plus=plus))
+
+    def describe(self):
+        return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), ' \
+               f'b={self.bank:.1f}, p={self.proba:.3f}, roi={self.roi:.3f}'
+
+    def plot(self):
+        import matplotlib.pylab as plt
+        line = list(self.line)
+        line.sort(key=lambda i: i['date_time'])
+        x = [i['date_time'] for i in line]
+        y = np.cumsum([i['plus'] for i in line])
+        plt.plot(x, y)
+        plt.show()

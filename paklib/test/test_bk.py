@@ -20,3 +20,34 @@ def test_second_odd():
 def test_probability():
     p = bk.probability(1052, 1235)
     assert 0.0 < p < 0.5
+
+
+def test_describe():
+    import numpy as np
+    win = np.array([True, False, False, True, False])
+    draw = np.array([False, False, False, False, True])
+    odds = np.array([2.5, 2.2, 2.3, 2.0, 2.0])
+    assert bk.describe(win, draw=draw) == '2/1/2 (4), p=0.500'
+    assert bk.describe(win, draw=draw, odds=odds) == '2/1/2 (4), b=0.5, p=0.500, roi=0.125'
+
+
+def test_bank():
+    import datetime
+    import pytest
+    b = bk.Bank()
+    b.stake(datetime.datetime(2020, 10, 1, 15, 00), 'id1', 'name1', 1.0, 2.5, True, False)
+    b.stake(datetime.datetime(2020, 10, 1, 20, 00), 'id2', 'name2', 1.0, 2.2, False, False)
+    b.stake(datetime.datetime(2020, 10, 3, 15, 00), 'id3', 'name3', 1.0, 2.3, False, False)
+    b.stake(datetime.datetime(2020, 10, 5, 22, 00), 'id4', 'name4', 1.0, 2.0, True, False)
+    b.stake(datetime.datetime(2020, 10, 7, 7, 00), 'id5', 'name5', 1.0, 2.0, False, True)
+    assert b.win == 2
+    assert b.draw == 1
+    assert b.lose == 2
+    assert b.n_stakes == 4
+    assert b.bank == 0.5
+    assert b.proba == 0.5
+    assert b.roi == 0.5 / 4
+    assert b.describe() == '2/1/2 (4), b=0.5, p=0.500, roi=0.125'
+    with pytest.raises(AssertionError):
+        b.stake(datetime.datetime(2020, 10, 7, 7, 00), 'id5', 'name5', 1.0, 2.0, True, True)
+    b.plot()

@@ -1,4 +1,5 @@
 import datetime
+from dataclasses import dataclass
 from typing import List
 
 import numpy as np
@@ -153,55 +154,52 @@ def stake_system_optimal(tip_all, mn=2, mx=6, draw=0, stake=1, odd=1.85):
     plt.show()
 
 
-def describe(win: np.ndarray, draw: np.ndarray = None, odds: np.ndarray = None):
+@dataclass
+class StakesDescription:
+
+    def __init__(self, win: int, draw: int, lose: int, bank: float = None):
+        self.win = win
+        self.draw = draw
+        self.lose = lose
+        self.n_stakes = self.win + self.lose
+        self.proba = self.win / self.n_stakes if self.n_stakes else np.nan
+        self.bank = bank
+
+        if self.bank is not None:
+            self.roi = self.bank / self.n_stakes if self.n_stakes else np.nan
+        else:
+            self.roi = np.nan
+
+    def __repr__(self):
+        if self.bank is None:
+            return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), p={self.proba:.3f}'
+        else:
+            return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), ' \
+                   f'b={self.bank:.1f}, p={self.proba:.3f}, roi={self.roi:.3f}'
+
+
+def describe(win, draw=None, odds=None, key=None) -> StakesDescription:
     draw = draw if draw is not None else np.full(win.shape, False)
-    W = np.sum(win)
-    D = np.sum(draw)
+    if key is not None:
+        win = win[key]
+        draw = draw[key]
+
+    W = int(np.sum(win))
+    D = int(np.sum(draw))
     L = win.shape[0] - W - D
-    N = W + L
-    P = W / N if N else np.nan
+
     if odds is None:
-        return f'{W}/{D}/{L} ({N}), p={P:.3f}'
+        return StakesDescription(W, D, L)
     else:
+        odds = odds[key]
         B = (odds - 1.0)[win].sum() - L
-        ROI = B / N if N else np.nan
-        return f'{W}/{D}/{L} ({N}), b={B:.1f}, p={P:.3f}, roi={ROI:.3f}'
+        return StakesDescription(W, D, L, bank=B)
 
 
 class Bank(object):
 
     def __init__(self):
         self.line: List[dict] = []
-
-    @property
-    def win(self):
-        return sum([i['plus'] > 0.0 for i in self.line])
-
-    @property
-    def draw(self):
-        return sum([i['plus'] == 0.0 for i in self.line])
-
-    @property
-    def lose(self):
-        return sum([i['plus'] < 0.0 for i in self.line])
-
-    @property
-    def n_stakes(self):
-        return sum([i['plus'] != 0.0 for i in self.line])
-
-    @property
-    def bank(self):
-        return sum([i['plus'] for i in self.line])
-
-    @property
-    def proba(self):
-        n = self.n_stakes
-        return (self.win / n) if n else np.nan
-
-    @property
-    def roi(self):
-        n = self.n_stakes
-        return (self.bank / n) if n else np.nan
 
     def stake(self, date_time: datetime.datetime, id: str, name: str,
               value: float, odds: float, win: bool, draw: bool = False):
@@ -215,15 +213,25 @@ class Bank(object):
         self.line.append(dict(date_time=date_time, id=id, name=name,
                               value=value, odds=odds, win=win, draw=draw, plus=plus))
 
-    def describe(self):
-        return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), ' \
-               f'b={self.bank:.1f}, p={self.proba:.3f}, roi={self.roi:.3f}'
+    def describe(self) -> StakesDescription:
+        win = sum([i['plus'] > 0.0 for i in self.line])
+        draw = sum([i['plus'] == 0.0 for i in self.line])
+        lose = sum([i['plus'] < 0.0 for i in self.line])
+        bank = sum([i['plus'] for i in self.line])
+        return StakesDescription(win, draw, lose, bank=bank)
 
     def plot(self):
-        import matplotlib.pylab as plt
+        import plotly.graph_objs as go
         line = list(self.line)
         line.sort(key=lambda i: i['date_time'])
         x = [i['date_time'] for i in line]
         y = np.cumsum([i['plus'] for i in line])
-        plt.plot(x, y)
-        plt.show()
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=0.5)))
+        fig.update_layout(
+            title='Bank line',
+            xaxis_title='date',
+            yaxis_title='Bank',
+        )
+        fig.show()

@@ -81,7 +81,7 @@ def make_dir_for_path(name: Union[str, List[str]]):
 def make_dir_for_file(name: Union[str, List[str]]):
     name = path(name)
     path_name, file_name = os.path.split(name)
-    if path:
+    if path_name:
         os.makedirs(path_name, exist_ok=True)
 
 

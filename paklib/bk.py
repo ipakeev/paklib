@@ -100,10 +100,10 @@ def DNB_DC(odd, proba=False):
     return list(get_odd(p))
 
 
-def kelly(pred, odd, key=None):
-    if key is not None:
-        pred = pred[key]
-        odd = odd[key]
+def kelly(pred, odd, mask=None):
+    if mask is not None:
+        pred = pred[mask]
+        odd = odd[mask]
     return (pred * odd - 1) / (odd - 1)
 
 
@@ -158,59 +158,103 @@ def stake_system_optimal(tip_all, mn=2, mx=6, draw=0, stake=1, odd=1.85):
 @dataclass
 class StakesDescription:
 
-    def __init__(self, win: int, draw: int, lose: int, bank: float = None):
-        self.win = win
-        self.draw = draw
-        self.lose = lose
+    def __init__(self, win: int, draw: int, lose: int, bank: float = None,
+                 cf: float = None, target: str = 'bank'):
+        self.win = int(win)
+        self.draw = int(draw)
+        self.lose = int(lose)
         self.n_stakes = self.win + self.lose
-        self.proba = self.win / self.n_stakes if self.n_stakes else np.nan
-        self.bank = bank
 
-        if self.bank is not None:
-            self.roi = self.bank / self.n_stakes if self.n_stakes else np.nan
+        if self.n_stakes:
+            self.proba = self.win / self.n_stakes
         else:
-            self.roi = np.nan
+            self.proba = 0.0
+
+        if (bank is not None) and self.n_stakes:
+            self.bank = bank if cf is None else bank * cf
+            self.roi = bank / self.n_stakes
+            self.score = self.bank * (min(0.7, self.proba) ** 0.3) * (min(0.7, self.roi) ** 0.3) if bank > 0 else bank
+        else:
+            self.bank = 0.0
+            self.roi = 0.0
+            self.score = 0.0
+
+        self.target = target
+
+    def _check_other(self, other):
+        assert self.target == other.target
+
+    def __add__(self, other):
+        return StakesDescription(self.win + other.win,
+                                 self.draw + other.draw,
+                                 self.lose + other.lose,
+                                 bank=self.bank + other.bank)
+
+    def __gt__(self, other):
+        if isinstance(other, StakesDescription):
+            self._check_other(other)
+            return self.get(self.target) > other.get(self.target)
+        return self.get(self.target) > other
+
+    def __ge__(self, other):
+        if isinstance(other, StakesDescription):
+            self._check_other(other)
+            return self.get(self.target) >= other.get(self.target)
+        return self.get(self.target) >= other
+
+    def __lt__(self, other):
+        if isinstance(other, StakesDescription):
+            self._check_other(other)
+            return self.get(self.target) < other.get(self.target)
+        return self.get(self.target) < other
+
+    def __le__(self, other):
+        if isinstance(other, StakesDescription):
+            self._check_other(other)
+            return self.get(self.target) <= other.get(self.target)
+        return self.get(self.target) <= other
 
     def __repr__(self):
-        if self.bank is None:
-            return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), p={self.proba:.3f}'
-        else:
-            return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), ' \
-                   f'b={self.bank:.1f}, p={self.proba:.3f}, roi={self.roi:.3f}'
+        return f'{self.win}/{self.draw}/{self.lose} ({self.n_stakes}), ' \
+               f'b={self.bank:.1f}, p={self.proba:.3f}, roi={self.roi:.3f}, score={self.score:.3f}'
+
+    def get(self, name: str = None):
+        return self.__getattribute__(self.target if name is None else name)
 
 
-def describe(win, draw=None, odds=None, key=None) -> StakesDescription:
+def describe(win, draw=None, odds=None, mask=None, target: str = 'bank') -> StakesDescription:
     assert win.dtype == bool
     draw = draw if draw is not None else np.full(win.shape, False)
     if odds is not None:
-        if key is None:
-            key = ~np.isnan(odds)
+        if mask is None:
+            mask = ~np.isnan(odds)
         else:
-            key &= ~np.isnan(odds)
-    if key is not None:
-        win = win[key]
-        draw = draw[key]
+            mask &= ~np.isnan(odds)
+    if mask is not None:
+        win = win[mask]
+        draw = draw[mask]
         if odds is not None:
-            odds = odds[key]
+            odds = odds[mask]
 
     W = win.sum()
     D = draw.sum()
     L = win.shape[0] - W - D
 
     if odds is None:
-        return StakesDescription(W, D, L)
+        return StakesDescription(W, D, L, target=target)
     else:
         B = (odds - 1.0)[win].sum() - L
-        return StakesDescription(W, D, L, bank=B)
+        return StakesDescription(W, D, L, bank=B, target=target)
 
 
 class Bank(object):
 
     def __init__(self):
-        self.df = pd.DataFrame(columns=['date_time', 'id', 'name', 'value', 'odds', 'win', 'draw', 'plus'])
+        self.df = pd.DataFrame(columns=['date_time', 'league_id', 'name',
+                                        'pred', 'odds', 'win', 'draw', 'plus', 'value'])
 
-    def stake(self, date_time: datetime.datetime, id: str, name: str,
-              value: float, odds: float, win: bool, draw: bool = False):
+    def stake(self, date_time: datetime.datetime, league_id: int, name: str,
+              pred: float, odds: float, win: bool, draw: bool = False, value: float = 1.0):
         assert not (win and draw)
         if win:
             plus = value * (odds - 1.0)
@@ -218,18 +262,27 @@ class Bank(object):
             plus = 0.0
         else:
             plus = -value
-        self.df.loc[len(self.df)] = [date_time, id, name, value, odds, win, draw, plus]
+        self.df.loc[len(self.df)] = [date_time, league_id, name, pred, odds, win, draw, plus, value]
 
-    def describe(self) -> StakesDescription:
-        win = self.df['win'].sum()
-        draw = self.df['draw'].sum()
-        lose = self.df.shape[0] - win - draw
-        bank = self.df['plus'].sum()
+    def describe(self, mask=None) -> StakesDescription:
+        df = self.df
+        if mask is not None:
+            df = df[mask]
+
+        win = df['win'].sum()
+        draw = df['draw'].sum()
+        lose = df.shape[0] - win - draw
+        bank = df['plus'].sum()
         return StakesDescription(win, draw, lose, bank=bank)
 
-    def plot(self, save: str = None):
+    def plot(self, mask=None, save_name=None):
         import plotly.graph_objs as go
-        df = self.df.sort_values('date_time')
+
+        df = self.df.copy()
+        if mask is not None:
+            df = df[mask]
+
+        df = df.sort_values('date_time')
         x = df['date_time']
         y = df['plus'].cumsum()
 
@@ -241,9 +294,9 @@ class Bank(object):
             yaxis_title='Bank',
         )
 
-        if save is None:
+        if save_name is None:
             fig.show()
         else:
             from paklib.io import make_dir_for_file
-            make_dir_for_file(save)
-            fig.write_image(save)
+            make_dir_for_file(save_name)
+            fig.write_image(save_name)

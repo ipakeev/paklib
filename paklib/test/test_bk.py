@@ -1,3 +1,5 @@
+import pytest
+
 from paklib import bk
 
 
@@ -66,22 +68,38 @@ def test_describe():
     win = np.array([True, True, False, False, True, False])
     draw = np.array([False, False, False, False, False, True])
     odds = np.array([2.0, 2.5, 2.2, 2.3, 2.0, 2.0])
-    assert bk.describe(win, draw=draw).__repr__() == '3/1/2 (5), p=0.600'
-    assert bk.describe(win, draw=draw, odds=odds).__repr__() == '3/1/2 (5), b=1.5, p=0.600, roi=0.300'
+    assert bk.describe(win, draw=draw).__repr__() == '3/1/2 (5), b=0.0, p=0.600, roi=0.000, score=0.000'
+
+    desc = bk.describe(win, draw=draw, odds=odds, target='bank')
+    assert desc.__repr__() == '3/1/2 (5), b=1.5, p=0.600, roi=0.300, score=0.897'
+
+    assert desc > bk.describe(np.array([True]), odds=np.array([2.0]))
+    assert not desc > bk.describe(np.array([True]), odds=np.array([5.0]))
+    assert desc < bk.describe(np.array([True]), odds=np.array([5.0]))
+    assert not desc < bk.describe(np.array([True]), odds=np.array([2.0]))
+
+    assert desc > 1.0
+    assert desc >= 1.5
+    assert desc <= 1.5
+    assert desc < 2.0
+
+    with pytest.raises(AssertionError):
+        _ = desc > bk.describe(np.array([True]), odds=np.array([2.0]), target='roi')
 
 
 def test_bank():
     import datetime
     import pytest
     b = bk.Bank()
-    b.stake(datetime.datetime(2020, 10, 1, 17, 00), 'id0', 'name0', 1.0, 2.0, True, False)
-    b.stake(datetime.datetime(2020, 10, 1, 15, 00), 'id1', 'name1', 1.0, 2.5, True, False)
-    b.stake(datetime.datetime(2020, 10, 1, 20, 00), 'id2', 'name2', 1.0, 2.2, False, False)
-    b.stake(datetime.datetime(2020, 10, 3, 15, 00), 'id3', 'name3', 1.0, 2.3, False, False)
-    b.stake(datetime.datetime(2020, 10, 5, 22, 00), 'id4', 'name4', 1.0, 2.0, True, False)
-    b.stake(datetime.datetime(2020, 10, 7, 7, 00), 'id5', 'name5', 1.0, 2.0, False, True)
-    assert b.describe().__repr__() == '3/1/2 (5), b=1.5, p=0.600, roi=0.300'
+    b.stake(datetime.datetime(2020, 10, 1, 17, 00), 1, 'name0', 2.0, True, False)
+    b.stake(datetime.datetime(2020, 10, 1, 15, 00), 1, 'name1', 2.5, True, False)
+    b.stake(datetime.datetime(2020, 10, 1, 20, 00), 1, 'name2', 2.2, False, False)
+    b.stake(datetime.datetime(2020, 10, 3, 15, 00), 1, 'name3', 2.3, False, False)
+    b.stake(datetime.datetime(2020, 10, 5, 22, 00), 2, 'name4', 2.0, True, False)
+    b.stake(datetime.datetime(2020, 10, 7, 7, 00), 2, 'name5', 2.0, False, True)
+    assert b.describe().__repr__() == '3/1/2 (5), b=1.5, p=0.600, roi=0.300, score=0.897'
+    assert b.describe(league_id=1).__repr__() == '2/0/2 (4), b=0.5, p=0.500, roi=0.125, score=0.218'
     with pytest.raises(AssertionError):
-        b.stake(datetime.datetime(2020, 10, 7, 7, 00), 'id5', 'name5', 1.0, 2.0, True, True)
+        b.stake(datetime.datetime(2020, 10, 7, 7, 00), 3, 'name5', 2.0, True, True)
     b.plot()
-    b.plot('img/1.jpg')
+    # b.plot(save_name='img/1.jpg')
